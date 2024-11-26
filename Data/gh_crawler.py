@@ -7,7 +7,7 @@ headers = {"Authorization": "token *TOKEN*"}
 
 # Constants & language argument.
 NUM_REPOS = 25_000
-MIN_STARS = 50
+MIN_STARS = 1000
 LAST_ACTIVE = '2020-01-01'
 LANGUAGE = "java" if len(sys.argv) <= 1 else sys.argv[1]  # Default to Java, if none passed.
 
@@ -43,7 +43,7 @@ def run_query(max_stars):
 		# by repeatedly lowering the bar.
 		query = f"""
 		{{
-		  search(query: "language:{LANGUAGE} fork:false pushed:>{LAST_ACTIVE} sort:stars stars:<{max_stars}", type: REPOSITORY, first: 100 {', after: "' + end_cursor + '"' if end_cursor else ''}) {{
+		  search(query: "language:{LANGUAGE} fork:false pushed:>{LAST_ACTIVE} sort:stars stars:<{max_stars}", type: REPOSITORY, first: 40 {', after: "' + end_cursor + '"' if end_cursor else ''}) {{
 			edges {{
 			  node {{
 				... on Repository {{
@@ -71,14 +71,18 @@ def run_query(max_stars):
 		while not success and attempts < 3:
 			request = requests.post('https://api.github.com/graphql', json={'query': query}, headers=headers)
 			content = request.json()
-			if 'data' not in content or 'search' not in content['data']:
+			print(content)
+			if 'data' not in content or (content['data'] is None and 'errors' in content) or (content['data'] is not None and 'search' not in content['data']):
+				print("let's retry")
+				attempts += 1
+				time.sleep(10)
 				# If this is simply a signal to pause querying, wait two minutes.
-				if 'message' in content and 'wait' in content['message']:
-					attempts += 1
-					time.sleep(120)
-				# Otherwise, assume we've hit the end of the stream.
-				else:
-					break
+				# if 'message' in content and 'wait' in content['message']:
+				# 	attempts += 1
+				# 	time.sleep(120)
+				# # Otherwise, assume we've hit the end of the stream.
+				# else:
+				# 	break
 			else:
 				success = True
 		if not success:
